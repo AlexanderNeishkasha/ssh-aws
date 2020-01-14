@@ -1,17 +1,19 @@
 package main
 
 import (
-	"bufio"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/creack/pty"
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/ssh/terminal"
 	"io"
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
 )
 
 const RunningCode = 16
@@ -33,19 +35,36 @@ func main() {
 	}
 	pathToKey := os.Getenv("STAGE_KEY")
 	cmd := exec.Command("ssh", "-i"+pathToKey, "ubuntu@"+ips["stg"])
-	f, err := pty.Start(cmd)
+	// Start the command with a pty.
+	ptmx, err := pty.Start(cmd)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Make sure to close the pty at the end.
+	defer func() { _ = ptmx.Close() }() // Best effort.
+
+	// Handle pty size.
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGWINCH)
+	go func() {
+		for range ch {
+			if err := pty.InheritSize(os.Stdin, ptmx); err != nil {
+				log.Printf("error resizing pty: %s", err)
+			}
+		}
+	}()
+	ch <- syscall.SIGWINCH // Initial resize.
+
+	// Set stdin in raw mode.
+	oldState, err := terminal.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
 		panic(err)
 	}
+	defer func() { _ = terminal.Restore(int(os.Stdin.Fd()), oldState) }() // Best effort.
 
-	var command string
-	go func() {
-		command = bufio.NewScanner(os.Stdin).Text()
-		f.WriteString(command)
-		io.Copy(os.Stdout, f)
-	}()
-	io.Copy(os.Stdout, f)
-
+	// Copy stdin to the pty and the pty to stdout.
+	go func() { _, _ = io.Copy(ptmx, os.Stdin) }()
+	_, _ = io.Copy(os.Stdout, ptmx)
 }
 
 func initSession() *session.Session {
