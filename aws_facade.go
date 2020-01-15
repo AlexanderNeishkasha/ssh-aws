@@ -9,6 +9,8 @@ import (
 	"log"
 )
 
+const RunningCode = 16
+
 type AwsFacade struct {
 	region    string
 	env       string
