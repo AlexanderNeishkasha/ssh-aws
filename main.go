@@ -2,10 +2,6 @@ package main
 
 import (
 	"errors"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/creack/pty"
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/ssh/terminal"
@@ -23,69 +19,17 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error loading .env file")
 	}
-	amazonSession := initSession()
-	resp := loadInstances(amazonSession)
-	environment := os.Args[1]
-	ip, err := ip(environment, resp.Reservations)
+	env := os.Args[1]
+	awsFacade := AwsFacade{region: os.Getenv("AWS_DEFAULT_REGION"), env: env}
+	ip, err := awsFacade.IP()
 	if err != nil {
 		log.Fatal(err)
 	}
-	pathToKey, err := pathToKey(environment)
+	pathToKey, err := pathToKey(env)
 	if err != nil {
 		log.Fatal(err)
 	}
 	runSsh(ip, pathToKey)
-}
-
-func initSession() *session.Session {
-	region := os.Getenv("AWS_DEFAULT_REGION")
-	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String(region),
-		Credentials: credentials.NewEnvCredentials(),
-	})
-	if err != nil {
-		log.Println("Error with creating aws session")
-		log.Fatal(err)
-	}
-	return sess
-}
-
-func loadInstances(amazonSession *session.Session) *ec2.DescribeInstancesOutput {
-	ec2Client := ec2.New(amazonSession)
-	req, resp := ec2Client.DescribeInstancesRequest(&ec2.DescribeInstancesInput{})
-	if err := req.Send(); err != nil {
-		log.Println("Error sending request")
-		log.Fatal(err)
-	}
-	return resp
-}
-
-func env(environment string, instance *ec2.Instance) string {
-	role, env := false, ""
-	for _, tag := range instance.Tags {
-		if *tag.Key == "role" && *tag.Value == "PhpServer" {
-			role = true
-		}
-		if *tag.Key == "env" && *tag.Value == environment {
-			env = *tag.Value
-		}
-	}
-	if role {
-		return env
-	}
-	return ""
-}
-
-func ip(environment string, reservations []*ec2.Reservation) (ip string, err error) {
-	for _, reservation := range reservations {
-		for _, instance := range reservation.Instances {
-			env := env(environment, instance)
-			if *instance.State.Code == RunningCode && env != "" {
-				return *instance.PrivateIpAddress, nil
-			}
-		}
-	}
-	return "", errors.New("IP for env '"+environment+"' not found")
 }
 
 func pathToKey(environment string) (key string, err error) {
@@ -94,7 +38,7 @@ func pathToKey(environment string) (key string, err error) {
 	} else if environment == "prod" {
 		return os.Getenv("PROD_KEY"), nil
 	} else {
-		return "", errors.New("Key for env '"+environment+"' not found")
+		return "", errors.New("Key for env '" + environment + "' not found")
 	}
 }
 
