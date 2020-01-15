@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -27,18 +26,13 @@ func main() {
 	amazonSession := initSession()
 	resp := loadInstances(amazonSession)
 	environment := os.Args[1]
-	fmt.Println(environment)
 	ip, err := ip(environment, resp.Reservations)
 	if err != nil {
 		log.Fatal(err)
 	}
-	var pathToKey string
-	if environment == "stg" {
-		pathToKey = os.Getenv("STAGE_KEY")
-	} else if environment == "prod" {
-		pathToKey = os.Getenv("PROD_KEY")
-	} else {
-		log.Fatal("Invalid environment")
+	pathToKey, err := pathToKey(environment)
+	if err != nil {
+		log.Fatal(err)
 	}
 	runSsh(ip, pathToKey)
 }
@@ -92,6 +86,16 @@ func ip(environment string, reservations []*ec2.Reservation) (ip string, err err
 		}
 	}
 	return "", errors.New("IP for env '"+environment+"' not found")
+}
+
+func pathToKey(environment string) (key string, err error) {
+	if environment == "stg" {
+		return os.Getenv("STAGE_KEY"), nil
+	} else if environment == "prod" {
+		return os.Getenv("PROD_KEY"), nil
+	} else {
+		return "", errors.New("Key for env '"+environment+"' not found")
+	}
 }
 
 func runSsh(ip string, pathToKey string) {
