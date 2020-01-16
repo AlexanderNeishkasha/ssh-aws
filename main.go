@@ -2,28 +2,25 @@ package main
 
 import (
 	"fmt"
-	"github.com/joho/godotenv"
 	"log"
 	"os"
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
-	}
+	config := getConfig()
 	env := getEnv()
 	fmt.Println("Connecting...")
-	awsFacade := AwsFacade{region: os.Getenv("AWS_DEFAULT_REGION"), env: env}
+	awsFacade := AwsFacade{region: config.Region, env: env, accessKey: config.AccessKey, secretKey: config.SecretKey}
 	ip, err := awsFacade.IP()
 	if err != nil {
 		log.Fatal(err)
 	}
-	ssh := SshFacade{ip, env}
+	ssh := SshFacade{ip: ip, env: env, prodKey: config.PathToProdKey, stageKey: config.PathToStageKey}
 	ssh.Connect()
 }
 
 func getEnv() string {
-	if len(os.Args) > 1  {
+	if len(os.Args) > 1 {
 		return os.Args[1]
 	}
 	var env string

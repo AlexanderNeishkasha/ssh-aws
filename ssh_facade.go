@@ -13,8 +13,10 @@ import (
 )
 
 type SshFacade struct {
-	ip  string
-	env string
+	ip       string
+	env      string
+	stageKey string
+	prodKey  string
 }
 
 func (ssh *SshFacade) Connect() {
@@ -57,9 +59,9 @@ func (ssh *SshFacade) Connect() {
 
 func (ssh *SshFacade) pathToKey() (key string, err error) {
 	if ssh.env == "stg" {
-		return os.Getenv("STAGE_KEY"), nil
+		return ssh.stageKey, nil
 	} else if ssh.env == "prod" {
-		return os.Getenv("PROD_KEY"), nil
+		return ssh.prodKey, nil
 	} else {
 		return "", errors.New("Key for env '" + ssh.env + "' not found")
 	}
