@@ -9,4 +9,4 @@ brew install alexanderneishkasha/ssh-aws/ssh-aws
 
 # Usage
 Run the command `ssh-aws {env}` where `env` is `stg` or `prod`, enter the configurations.  
-If you want to change the configurations, edit the file `$HOME/.ssh-aws-config.yaml`.
+If you want to change the configurations, edit the file `~/.ssh-aws/config.yaml`.
