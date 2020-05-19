@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	config := getConfig()
+	config := NewConfig()
 	env := getEnv()
 	fmt.Println("Connecting...")
 	awsFacade := AwsFacade{region: config.Region, env: env, accessKey: config.AccessKey, secretKey: config.SecretKey}
