@@ -52,7 +52,7 @@ func loadConfigFromFile() (config *Config, err error) {
 			err = errors.New("error while parsing config file")
 		}
 	}()
-	if err = decoder.Decode(config); err != nil {
+	if err = decoder.Decode(&config); err != nil {
 		return nil, err
 	}
 	return config, err
