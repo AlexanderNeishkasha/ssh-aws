@@ -15,6 +15,7 @@ type AwsFacade struct {
 	region    string
 	accessKey string
 	secretKey string
+	token     string
 	env       string
 	session   *session.Session
 	instances []*ec2.Instance
@@ -38,7 +39,7 @@ func (awsFacade *AwsFacade) initSession() {
 	}
 	awsSession, err := session.NewSession(&aws.Config{
 		Region:      aws.String(awsFacade.region),
-		Credentials: credentials.NewStaticCredentials(awsFacade.accessKey, awsFacade.secretKey, ""),
+		Credentials: credentials.NewStaticCredentials(awsFacade.accessKey, awsFacade.secretKey, awsFacade.token),
 	})
 	if err != nil {
 		log.Fatal(err)

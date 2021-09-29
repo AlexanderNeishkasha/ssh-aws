@@ -1,90 +1,57 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/ini.v1"
 	"log"
 	"os"
 )
 
 type Config struct {
-	Region         string `yaml:"Region"`
-	AccessKey      string `yaml:"AccessKey"`
-	SecretKey      string `yaml:"SecretKey"`
-	PathToStageKey string `yaml:"PathToStageKey"`
-	PathToProdKey  string `yaml:"PathToProdKey"`
+	Region         string
+	AccessKey      string
+	SecretKey      string
+	SessionToken   string
+	PathToStageKey string
+	PathToProdKey  string
 }
 
-const configPath = ".ssh-aws/config.yaml"
+const credentialsFile = ".aws/credentials"
 
-func NewConfig() *Config {
-	config, err := loadConfigFromFile()
-	if err != nil {
-		config = createConfig()
-		config.store()
-	}
-	return config
-}
-
-func (c *Config) store() {
-	file := createConfigFile()
-	defer func() {
-		err := file.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
-	encoder := yaml.NewEncoder(file)
-	if err := encoder.Encode(&c); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func loadConfigFromFile() (config *Config, err error) {
-	file, err := os.Open(getConfigPath())
-	if err != nil {
-		return nil, err
-	}
-	decoder := yaml.NewDecoder(file)
-	defer func() {
-		if parsingError := recover(); parsingError != nil {
-			err = errors.New("error while parsing config file")
-		}
-	}()
-	if err = decoder.Decode(&config); err != nil {
-		return nil, err
-	}
-	return config, err
-}
-
-func createConfig() *Config {
-	return &Config{
-		Region:         inputField("aws region"),
-		AccessKey:      inputField("access key"),
-		SecretKey:      inputField("secret key"),
-		PathToStageKey: inputField("path to stg key"),
-		PathToProdKey:  inputField("path to prod key"),
-	}
-}
-
-func createConfigFile() *os.File {
+func NewConfig() (*Config, error) {
 	path := getConfigPath()
-	if _, err := os.Stat(path); err != nil {
-		if err := os.MkdirAll(path, os.ModePerm); err != nil {
-			log.Fatal(err)
-		}
-	}
-	file, err := os.Create(path)
+	cfg, err := ini.Load(path)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return file
+
+	pathToStageKey := cfg.Section("certs").Key("stg").String()
+	if pathToStageKey == "" {
+		pathToStageKey = inputField("path to stg key")
+		cfg.Section("certs").Key("stg").SetValue(pathToStageKey)
+		cfg.SaveTo(path)
+	}
+
+	pathToProdKey := cfg.Section("certs").Key("prod").String()
+	if pathToProdKey == "" {
+		pathToProdKey = inputField("path to prod key")
+		cfg.Section("certs").Key("prod").SetValue(pathToProdKey)
+		cfg.SaveTo(path)
+	}
+
+	return &Config{
+		Region:         cfg.Section("default").Key("region").String(),
+		AccessKey:      cfg.Section("default").Key("aws_access_key_id").String(),
+		SecretKey:      cfg.Section("default").Key("aws_secret_access_key").String(),
+		SessionToken:   cfg.Section("default").Key("aws_session_token").String(),
+		PathToStageKey: pathToStageKey,
+		PathToProdKey:  pathToProdKey,
+	}, nil
 }
 
 func getConfigPath() string {
 	homedir, _ := os.UserHomeDir()
-	return homedir + "/" + configPath
+	return homedir + "/" + credentialsFile
 }
 
 func inputField(fieldName string) string {

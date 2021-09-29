@@ -7,10 +7,13 @@ import (
 )
 
 func main() {
-	config := NewConfig()
+	config, err := NewConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
 	env := getEnv()
 	fmt.Println("Connecting...")
-	awsFacade := AwsFacade{region: config.Region, env: env, accessKey: config.AccessKey, secretKey: config.SecretKey}
+	awsFacade := AwsFacade{region: config.Region, env: env, accessKey: config.AccessKey, secretKey: config.SecretKey, token: config.SessionToken}
 	ip, err := awsFacade.IP()
 	if err != nil {
 		log.Fatal(err)
